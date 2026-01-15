@@ -1,6 +1,8 @@
 """Configuration management for the Claude time proxy."""
 
-from pydantic import Field
+import sys
+
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,4 +41,17 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     """Load and return application settings."""
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as e:
+        for error in e.errors():
+            if error["loc"] == ("anthropic_api_key",):
+                print(
+                    "Error: CLAUDE_PROXY_ANTHROPIC_API_KEY environment variable is required.\n"
+                    "\n"
+                    "Set it in your environment or in a .env file:\n"
+                    "  export CLAUDE_PROXY_ANTHROPIC_API_KEY=sk-ant-...\n",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        raise
