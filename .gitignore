@@ -1,6 +1,7 @@
 # Environment and secrets
 .env
 *.env.local
+schedule.txt
 
 # Python
 __pycache__/

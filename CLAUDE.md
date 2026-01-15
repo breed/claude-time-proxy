@@ -22,9 +22,6 @@ python -m claude_time_proxy.main
 pytest
 pytest tests/test_schedule.py -v  # single test file
 pytest -k "test_allowed"          # tests matching pattern
-
-# Type checking (if added)
-# mypy src/
 ```
 
 ## Architecture
@@ -33,22 +30,34 @@ pytest -k "test_allowed"          # tests matching pattern
 src/claude_time_proxy/
 ├── main.py      # FastAPI app, routes, lifespan management
 ├── config.py    # Pydantic settings, loads from env vars (CLAUDE_PROXY_* prefix)
-├── schedule.py  # Time window logic (is_access_allowed, get_schedule_status)
+├── schedule.py  # Schedule file parsing and time window logic
 └── proxy.py     # HTTP proxying to Anthropic API (handles streaming)
 ```
 
-**Request flow:** Client → `/v1/{path}` route → `check_access()` (schedule + bypass key) → `proxy_request()` → Anthropic API
+**Request flow:** Client → `/v1/{path}` route → `check_access()` → `proxy_request()` → Anthropic API
 
 ## Configuration
 
-All settings via environment variables with `CLAUDE_PROXY_` prefix. See `.env.example`.
+Environment variables with `CLAUDE_PROXY_` prefix. See `.env.example`.
 
-Key settings:
 - `ANTHROPIC_API_KEY` - Required. The actual API key stored on the proxy.
-- `ALLOWED_DAYS` - JSON array of weekday numbers (0=Monday, 6=Sunday)
-- `START_HOUR`/`END_HOUR` - 24-hour format time window
-- `TIMEZONE` - IANA timezone name for schedule evaluation
-- `BYPASS_KEY` - Optional header key (`x-bypass-key`) to skip time checks
+- `SCHEDULE_FILE` - Path to schedule configuration file (default: `schedule.txt`)
+
+### Schedule file format
+
+See `schedule.example.txt`. Each line specifies a time period when access is allowed:
+
+- Lines have the form: `DAYS HH:MM-HH:MM`
+- DAYS are a comma-separated list (Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+- Times are in 24-hour format, local timezone
+- Lines starting with # are comments
+- Blank lines are ignored
+
+Example:
+```
+Mon,Tue,Wed,Thu,Fri 09:00-17:00
+Sat 10:00-14:00
+```
 
 ## Client Configuration
 

@@ -1,0 +1,16 @@
+# Claude Time Proxy Schedule Configuration
+#
+# Each line specifies a time period when the proxy allows access.
+# Format: DAYS HH:MM-HH:MM
+#
+# DAYS: Comma-separated list of days (Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+# TIME: 24-hour format, local timezone
+#
+# Lines starting with # are comments
+# Blank lines are ignored
+
+# Weekdays 9am-5pm
+Mon,Tue,Wed,Thu,Fri 09:00-17:00
+
+# Saturday morning
+Sat 10:00-14:00

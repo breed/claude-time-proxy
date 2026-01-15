@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     settings = get_cached_settings()
     print(f"Claude Time Proxy starting on {settings.host}:{settings.port}")
-    print(f"Schedule: {settings.allowed_days} from {settings.start_hour:02d}:{settings.start_minute:02d} to {settings.end_hour:02d}:{settings.end_minute:02d} ({settings.timezone})")
+    print(f"Schedule file: {settings.schedule_file}")
     yield
     print("Claude Time Proxy shutting down")
 
@@ -58,23 +58,18 @@ async def health_check():
 async def schedule_status():
     """Get current schedule status."""
     settings = get_cached_settings()
-    return get_schedule_status(settings)
+    return get_schedule_status(settings.schedule_file)
 
 
-def check_access(request: Request, settings: Settings) -> None:
+def check_access(settings: Settings) -> None:
     """
-    Check if access is allowed, considering bypass key.
+    Check if access is allowed based on schedule file.
 
     Raises:
         HTTPException: If access is denied.
     """
-    # Check for bypass key
-    bypass_key = request.headers.get("x-bypass-key")
-    if settings.bypass_key and bypass_key == settings.bypass_key:
-        return
-
-    if not is_access_allowed(settings):
-        status = get_schedule_status(settings)
+    if not is_access_allowed(settings.schedule_file):
+        status = get_schedule_status(settings.schedule_file)
         raise HTTPException(
             status_code=403,
             detail={
@@ -88,7 +83,7 @@ def check_access(request: Request, settings: Settings) -> None:
 async def proxy_v1(request: Request, path: str) -> Response:
     """Proxy requests to Claude API v1 endpoints."""
     settings = get_cached_settings()
-    check_access(request, settings)
+    check_access(settings)
 
     return await proxy_request(
         request=request,

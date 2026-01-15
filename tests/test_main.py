@@ -10,16 +10,22 @@ from claude_time_proxy.main import app, set_settings_getter
 
 
 @pytest.fixture
-def test_settings():
-    """Create test settings."""
+def schedule_file(tmp_path):
+    """Create a temporary schedule file."""
+    def _create(content: str) -> str:
+        path = tmp_path / "schedule.txt"
+        path.write_text(content)
+        return str(path)
+    return _create
+
+
+@pytest.fixture
+def test_settings(schedule_file):
+    """Create test settings with all-hours access."""
+    path = schedule_file("Mon,Tue,Wed,Thu,Fri,Sat,Sun 00:00-23:59")
     return Settings(
         anthropic_api_key="test-key",
-        timezone="UTC",
-        allowed_days=[0, 1, 2, 3, 4, 5, 6],  # All days allowed for testing
-        start_hour=0,
-        start_minute=0,
-        end_hour=23,
-        end_minute=59,
+        schedule_file=path,
     )
 
 
@@ -45,20 +51,16 @@ class TestScheduleEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert "access_allowed" in data
-        assert "timezone" in data
+        assert "rules" in data
 
 
 class TestAccessDenied:
-    def test_denied_outside_schedule(self):
-        # Create settings that deny all access
+    def test_denied_outside_schedule(self, schedule_file):
+        # Create settings with no access (empty rules)
+        path = schedule_file("# No rules - access denied")
         deny_settings = Settings(
             anthropic_api_key="test-key",
-            timezone="UTC",
-            allowed_days=[],  # No days allowed
-            start_hour=0,
-            start_minute=0,
-            end_hour=23,
-            end_minute=59,
+            schedule_file=path,
         )
         set_settings_getter(lambda: deny_settings)
         with TestClient(app) as client:
@@ -68,41 +70,12 @@ class TestAccessDenied:
         set_settings_getter(None)
 
 
-class TestBypassKey:
-    def test_bypass_key_allows_access(self):
-        # Create settings with bypass key that would normally deny access
-        bypass_settings = Settings(
-            anthropic_api_key="test-key",
-            timezone="UTC",
-            allowed_days=[],  # No days allowed
-            start_hour=0,
-            start_minute=0,
-            end_hour=23,
-            end_minute=59,
-            bypass_key="secret-bypass",
-        )
-        set_settings_getter(lambda: bypass_settings)
+class TestProxyEndpoint:
+    def test_proxy_forwards_request(self, test_settings):
+        set_settings_getter(lambda: test_settings)
         with TestClient(app) as client:
-            # Without bypass key - should be denied
-            response = client.post("/v1/messages", json={})
-            assert response.status_code == 403
-
-            # With wrong bypass key - should be denied
-            response = client.post(
-                "/v1/messages",
-                json={},
-                headers={"x-bypass-key": "wrong-key"},
-            )
-            assert response.status_code == 403
-
-            # With correct bypass key - would proceed (but fail at proxy stage without real API)
-            # We patch the proxy_request to verify it gets called
             with patch("claude_time_proxy.main.proxy_request") as mock_proxy:
                 mock_proxy.return_value = type("Response", (), {"status_code": 200, "content": b"{}"})()
-                response = client.post(
-                    "/v1/messages",
-                    json={},
-                    headers={"x-bypass-key": "secret-bypass"},
-                )
+                response = client.post("/v1/messages", json={})
                 mock_proxy.assert_called_once()
         set_settings_getter(None)
