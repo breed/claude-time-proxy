@@ -30,6 +30,12 @@ class Settings(BaseSettings):
         description="Path to schedule configuration file",
     )
 
+    # Users configuration file path
+    users_file: str = Field(
+        default="users.txt",
+        description="Path to users configuration file",
+    )
+
 
 def get_settings() -> Settings:
     """Load and return application settings."""

@@ -59,6 +59,17 @@ Mon,Tue,Wed,Thu,Fri 09:00-17:00
 Sat 10:00-14:00
 ```
 
+### Users file format
+
+The users file lists the keys associated with each user. It has the format:
+
+EMAIL whitespace RANDOM_PASSWORD
+
+when a request is received it checkes the API key against the key in the users file.
+
+Log the first and last access of a user in an access time period.
+The last access log entry should include the number of requests made by the user.
+
 ## Client Configuration
 
 On remote machines, configure Claude CLI to use this proxy:

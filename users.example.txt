@@ -1,0 +1,14 @@
+# Claude Time Proxy Users Configuration
+#
+# Each line specifies a user and their API key.
+# Format: EMAIL KEY
+#
+# EMAIL: The user's email address (used for logging)
+# KEY: A random string that the user will use as their API key
+#
+# Lines starting with # are comments
+# Blank lines are ignored
+
+# Example users
+alice@example.com sk-alice-random-key-12345
+bob@example.com sk-bob-another-key-67890

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from .config import Settings, get_settings
 from .proxy import proxy_request
 from .schedule import get_schedule_status, is_access_allowed
+from .users import get_access_tracker, validate_api_key
 
 # Module-level settings getter that can be replaced for testing
 _settings_getter: Callable[[], Settings] | None = None
@@ -36,7 +37,13 @@ async def lifespan(app: FastAPI):
     settings = get_cached_settings()
     print(f"Claude Time Proxy starting on {settings.host}:{settings.port}")
     print(f"Schedule file: {settings.schedule_file}")
+    print(f"Users file: {settings.users_file}")
     yield
+    # Log end of sessions for all users when shutting down
+    tracker = get_access_tracker()
+    for email in list(tracker.sessions.keys()):
+        tracker.log_session_end(email)
+    tracker.reset_all_sessions()
     print("Claude Time Proxy shutting down")
 
 
@@ -69,6 +76,12 @@ def check_access(settings: Settings) -> None:
         HTTPException: If access is denied.
     """
     if not is_access_allowed(settings.schedule_file):
+        # Log end of sessions for all users when access period ends
+        tracker = get_access_tracker()
+        for email in list(tracker.sessions.keys()):
+            tracker.log_session_end(email)
+        tracker.reset_all_sessions()
+
         status = get_schedule_status(settings.schedule_file)
         raise HTTPException(
             status_code=403,
@@ -79,11 +92,48 @@ def check_access(settings: Settings) -> None:
         )
 
 
+def check_user(request: Request, settings: Settings) -> str:
+    """
+    Validate the user's API key.
+
+    Args:
+        request: The incoming request.
+        settings: Application settings.
+
+    Returns:
+        The user's email if valid.
+
+    Raises:
+        HTTPException: If the API key is invalid.
+    """
+    api_key = request.headers.get("x-api-key") or request.headers.get("authorization", "").replace("Bearer ", "")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "Missing API key"},
+        )
+
+    user = validate_api_key(settings.users_file, api_key)
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "Invalid API key"},
+        )
+
+    return user.email
+
+
 @app.api_route("/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_v1(request: Request, path: str) -> Response:
     """Proxy requests to Claude API v1 endpoints."""
     settings = get_cached_settings()
     check_access(settings)
+    user_email = check_user(request, settings)
+
+    # Record access for the user
+    tracker = get_access_tracker()
+    tracker.record_access(user_email)
 
     return await proxy_request(
         request=request,
