@@ -11,6 +11,9 @@ dependencies = [
     "pydantic-settings>=2.0.0",
 ]
 
+[project.scripts]
+claude-time-proxy = "claude_time_proxy.main:run"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
