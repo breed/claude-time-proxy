@@ -20,9 +20,13 @@ class Settings(BaseSettings):
         default=None,
         description="Anthropic API key (optional if use_claude_credentials=True)",
     )
-    anthropic_base_url: str = Field(
+    anthropic_api_base_url: str = Field(
         default="https://api.anthropic.com",
-        description="Anthropic API base URL",
+        description="Anthropic API base URL (used with API key auth)",
+    )
+    claude_ai_base_url: str = Field(
+        default="https://claude.ai/api",
+        description="Claude.ai API base URL (used with OAuth credentials)",
     )
 
     # Use Claude CLI credentials (~/.claude/.credentials.json)

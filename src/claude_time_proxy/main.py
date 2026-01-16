@@ -140,7 +140,7 @@ async def proxy_v1(request: Request, path: str) -> Response:
     tracker = get_access_tracker()
     tracker.record_access(user_email)
 
-    # Get authentication credentials
+    # Get authentication credentials and base URL
     access_token = None
     api_key = None
 
@@ -151,12 +151,14 @@ async def proxy_v1(request: Request, path: str) -> Response:
                 status_code=503,
                 detail={"error": "Failed to get valid Claude credentials. Try running 'claude' to refresh login."},
             )
+        base_url = settings.claude_ai_base_url
     else:
         api_key = settings.anthropic_api_key
+        base_url = settings.anthropic_api_base_url
 
     return await proxy_request(
         request=request,
-        target_base_url=settings.anthropic_base_url,
+        target_base_url=base_url,
         path=f"v1/{path}",
         api_key=api_key,
         access_token=access_token,
