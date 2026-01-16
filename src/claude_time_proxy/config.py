@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # Use Claude CLI credentials (~/.claude/.credentials.json)
     use_claude_credentials: bool = Field(
-        default=False,
+        default=True,
         description="Use OAuth credentials from Claude CLI instead of API key",
     )
 
