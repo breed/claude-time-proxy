@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
 from .config import Settings, get_settings
+from .credentials import get_valid_access_token
 from .proxy import proxy_request
 from .schedule import get_schedule_status, is_access_allowed
 from .users import get_access_tracker, validate_api_key
@@ -38,6 +39,10 @@ async def lifespan(app: FastAPI):
     print(f"Claude Time Proxy starting on {settings.host}:{settings.port}")
     print(f"Schedule file: {settings.schedule_file}")
     print(f"Users file: {settings.users_file}")
+    if settings.use_claude_credentials:
+        print("Auth mode: Claude CLI credentials (~/.claude/.credentials.json)")
+    else:
+        print("Auth mode: Anthropic API key")
     yield
     # Log end of sessions for all users when shutting down
     tracker = get_access_tracker()
@@ -135,11 +140,26 @@ async def proxy_v1(request: Request, path: str) -> Response:
     tracker = get_access_tracker()
     tracker.record_access(user_email)
 
+    # Get authentication credentials
+    access_token = None
+    api_key = None
+
+    if settings.use_claude_credentials:
+        access_token = get_valid_access_token()
+        if not access_token:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Failed to get valid Claude credentials. Try running 'claude' to refresh login."},
+            )
+    else:
+        api_key = settings.anthropic_api_key
+
     return await proxy_request(
         request=request,
         target_base_url=settings.anthropic_base_url,
-        api_key=settings.anthropic_api_key,
         path=f"v1/{path}",
+        api_key=api_key,
+        access_token=access_token,
     )
 
 

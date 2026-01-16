@@ -2,7 +2,7 @@
 
 import sys
 
-from pydantic import Field, ValidationError
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,10 +16,19 @@ class Settings(BaseSettings):
     )
 
     # Claude API configuration
-    anthropic_api_key: str = Field(description="Anthropic API key")
+    anthropic_api_key: str | None = Field(
+        default=None,
+        description="Anthropic API key (optional if use_claude_credentials=True)",
+    )
     anthropic_base_url: str = Field(
         default="https://api.anthropic.com",
         description="Anthropic API base URL",
+    )
+
+    # Use Claude CLI credentials (~/.claude/.credentials.json)
+    use_claude_credentials: bool = Field(
+        default=False,
+        description="Use OAuth credentials from Claude CLI instead of API key",
     )
 
     # Proxy server configuration
@@ -41,17 +50,19 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     """Load and return application settings."""
-    try:
-        return Settings()
-    except ValidationError as e:
-        for error in e.errors():
-            if error["loc"] == ("anthropic_api_key",):
-                print(
-                    "Error: CLAUDE_PROXY_ANTHROPIC_API_KEY environment variable is required.\n"
-                    "\n"
-                    "Set it in your environment or in a .env file:\n"
-                    "  export CLAUDE_PROXY_ANTHROPIC_API_KEY=sk-ant-...\n",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-        raise
+    settings = Settings()
+
+    if not settings.anthropic_api_key and not settings.use_claude_credentials:
+        print(
+            "Error: No authentication configured.\n"
+            "\n"
+            "Either set an API key:\n"
+            "  export CLAUDE_PROXY_ANTHROPIC_API_KEY=sk-ant-...\n"
+            "\n"
+            "Or use Claude CLI credentials:\n"
+            "  export CLAUDE_PROXY_USE_CLAUDE_CREDENTIALS=true\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return settings

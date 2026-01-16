@@ -7,8 +7,9 @@ from fastapi import Request, Response
 async def proxy_request(
     request: Request,
     target_base_url: str,
-    api_key: str,
     path: str,
+    api_key: str | None = None,
+    access_token: str | None = None,
 ) -> Response:
     """
     Proxy an incoming request to the Claude API.
@@ -16,8 +17,9 @@ async def proxy_request(
     Args:
         request: The incoming FastAPI request.
         target_base_url: The base URL of the Claude API.
-        api_key: The Anthropic API key to use.
         path: The API path to forward to.
+        api_key: The Anthropic API key to use (for API key auth).
+        access_token: OAuth access token to use (for Claude credentials auth).
 
     Returns:
         The proxied response.
@@ -30,11 +32,17 @@ async def proxy_request(
     # Get request body
     body = await request.body()
 
-    # Build headers, replacing/adding the API key
+    # Build headers, replacing/adding auth
     headers = dict(request.headers)
     headers.pop("host", None)
     headers.pop("content-length", None)
-    headers["x-api-key"] = api_key
+
+    if access_token:
+        headers["Authorization"] = f"Bearer {access_token}"
+        headers.pop("x-api-key", None)
+    elif api_key:
+        headers["x-api-key"] = api_key
+        headers.pop("authorization", None)
 
     async with httpx.AsyncClient(timeout=300.0) as client:
         # Check if this is a streaming request
